@@ -15,20 +15,22 @@ public class Player : MonoBehaviour
     // Add a MEMBER VARIABLE here for the NavMeshAgent Component named _agent.
     // It does NOT need to be tunable in the Inspector.
 
-    // ??? _agent
+    private NavMeshAgent _agent;
 
     // STEP 1 -----------------------------------------------------------------
 
 
     // STEP 4 -----------------------------------------------------------------
-    // Next, we are going to add a teleport ability to the player. 
+    // Next, we are going to add a teleport ability to the player.
     // If the player clicks the SPACE bar, they should teleport back to the
     //      location they were at before they clicked.
     //
     // We need a Vector3 to keep track of their LAST KNOWN LOCATION.
     // Add a MEMBER VARIABLE here for that location.
     // It does NOT need to be tunable in the Inspector.
-    
+
+    private Vector3 _previousPosition;
+    private bool _hasPreviousPosition;
 
     // STEP 4 -----------------------------------------------------------------
 
@@ -36,6 +38,7 @@ public class Player : MonoBehaviour
     private RaycastHit _raycastHit;
     private bool _raycastSuccessful = false;
     private Ray _mouseRay;
+    private int _groundMask;
 
     // STEP 2 -----------------------------------------------------------------
     // UNCOMMENT the below method and choose the right method name.
@@ -47,21 +50,28 @@ public class Player : MonoBehaviour
     //      to use GetComponent to grab this GameObject's NavMeshAgent and store
     //      it in the _agent MEMBER VARIABLE.
     //
-    //private void ????()
-    //{
-    //
-    //    _mainCamera = Camera.main;
-    //    _animator = GetComponent<Animator>();
-    //}
+
+    private void Start()
+    {
+        _mainCamera = Camera.main;
+        _animator = GetComponent<Animator>();
+        _agent = GetComponent<NavMeshAgent>();
+        _groundMask = LayerMask.GetMask("Ground");
+    }
+
     // STEP 2 -----------------------------------------------------------------
 
     // ------------------------------------------------------------------------
     private void Update()
     {
-        if (Input.GetMouseButton(0))
+        if (_agent == null || !_agent.isOnNavMesh)
+            return;
+
+        if (Input.GetMouseButtonDown(0))
         {
             _mouseRay = _mainCamera.ScreenPointToRay(Input.mousePosition);
-            _raycastSuccessful = Physics.Raycast(_mouseRay, out _raycastHit);
+            _raycastSuccessful = Physics.Raycast(
+                _mouseRay, out _raycastHit, Mathf.Infinity, _groundMask);
 
             if (_raycastSuccessful)
             {
@@ -76,6 +86,10 @@ public class Player : MonoBehaviour
                 //
                 // Feature 2 should work after this step.
 
+                Vector3 positionBeforeClick = transform.position;
+                bool destinationSet = NavMesh.SamplePosition(
+                    mouseHitPosition, out NavMeshHit destination, 1.5f, _agent.areaMask)
+                    && _agent.SetDestination(destination.position);
 
                 // STEP 3 -----------------------------------------------------
 
@@ -84,10 +98,15 @@ public class Player : MonoBehaviour
                 //      walk somewhere new, we should also store our CURRENT
                 //      POSITION in our LAST KNOWN LOCATION MEMBER VARIABLE
                 //      here.
-                // 
+                //
                 // You'll need this GameObject's Transform's position.
                 // See an example in the documentation: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Transform-position.html
 
+                if (destinationSet)
+                {
+                    _previousPosition = positionBeforeClick;
+                    _hasPreviousPosition = true;
+                }
 
                 // STEP 5 -----------------------------------------------------
             }
@@ -97,23 +116,28 @@ public class Player : MonoBehaviour
         // Finally, we want to TELEPORT the player to the LAST KNOWN LOCATION
         //      if the player presses the space key.
         // First, detect IF the player PRESSED the SPACE KEY.
-        //      If they did, you'll need to call a new METHOD on their 
+        //      If they did, you'll need to call a new METHOD on their
         //      NAV MESH AGENT Component.
-        // I have not told you about this method >:)
+        // I have not told you about this method >: )
         // It's NOT "Move".
         // You'll need to read the NavMeshAgent documentation and choose
         //      the correct one: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/AI.NavMeshAgent.html
         // Feature 3 should work after this.
 
+        if (_hasPreviousPosition && Input.GetKeyDown(KeyCode.Space)
+            && _agent.Warp(_previousPosition))
+        {
+            _agent.ResetPath();
+        }
 
         // STEP 6 -------------------------------------------------------------
 
         // Uncomment the below line to fix the Pudu's animation if you want.
-        //_animator.SetBool("isMoving", _agent.velocity.magnitude > 0.0f);
+        _animator.SetBool("isMoving", _agent.velocity.magnitude > 0.0f);
     }
-    
+
     // ------------------------------------------------------------------------
-    private void OnDrawGizmos ()
+    private void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
         Gizmos.DrawRay(_mouseRay);
